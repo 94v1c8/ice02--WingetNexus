@@ -159,7 +159,7 @@
                 Headers = { ContentType = new MediaTypeHeaderValue("application/json") }
             };
 
-        var result = await Http.PutAsync($"api/packages/{package.Id}", stringContent);
+        var result = await Http.PutAsync($"api/v1/packages/{package.Id}", stringContent);
 
         if (result.IsSuccessStatusCode)
         {

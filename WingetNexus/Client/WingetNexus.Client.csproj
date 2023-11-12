@@ -16,8 +16,4 @@
 		<ProjectReference Include="..\Shared\WingetNexus.Shared.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <Folder Include="Components\Packages\" />
-	</ItemGroup>
-
 </Project>
