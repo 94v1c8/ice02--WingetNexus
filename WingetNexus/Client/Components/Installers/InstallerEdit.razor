@@ -1,0 +1,153 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Newtonsoft.Json;
+@using System.Net.Http.Headers
+
+@inject HttpClient Http
+@inject MudBlazor.ISnackbar snackBar
+
+
+
+@*     <MudTextField T="string" @bind-Value="PackageModel.Version"
+                  Label="Version" HelperText="Fill with version number" Required="true" />
+
+    <MudTextField T="string" @bind-Value="PackageModel.ShortDescription" Label="Short description" Required="true" RequiredError="Description is mandatory!" /> *@
+
+<MudPaper Class="mud-width-full ma-4 pa-4">
+    <MudFileUpload T="IBrowserFile" AppendMultipleFiles="false" FilesChanged="UploadFiles" Required="true">
+        <ButtonTemplate>
+            <MudButton HtmlTag="label"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AttachFile"
+                       for="@context">
+                Upload package
+            </MudButton>
+        </ButtonTemplate>
+    </MudFileUpload>
+
+    @if (files != null && files.Count > 0)
+    {
+        <MudList>
+            @foreach (var file in files)
+            {
+                <MudListItem Icon="@Icons.Material.Filled.AttachFile" @key="@file">
+                    @file.Name <code>@file.Size bytes</code>
+                </MudListItem>
+                @* TODO: remove file *@
+            }
+        </MudList>
+
+        @* <MudSwitch Label="User/Machine scope" /> *@
+
+        <div class="d-flex align-center justify-space-between">
+            <MudSelect T="string" Required="true" RequiredError="Type is mandatory!"
+                       @bind-Value="PackageModel.InstallerType" Label="Installer type">
+                <MudSelectItem Value="@("msix")">msix</MudSelectItem>
+                <MudSelectItem Value="@("msi")">msi</MudSelectItem>
+                <MudSelectItem Value="@("zip")">zip</MudSelectItem>
+                <MudSelectItem Value="@("appx")">appx</MudSelectItem>
+                <MudSelectItem Value="@("exe")">exe</MudSelectItem>
+                @* <MudSelectItem Value="@("inno")">inno</MudSelectItem>
+            <MudSelectItem Value="@("cab")">cab</MudSelectItem>
+            <MudSelectItem Value="@("pwa")">Progressive web app</MudSelectItem>
+            <MudSelectItem Value="@("nullsoft")">nullsoft</MudSelectItem>
+            <MudSelectItem Value="@("msstore")">MS Store</MudSelectItem> *@
+            </MudSelect>
+            <MudTextField @bind-Value="PackageModel.RelativeFilePath" Label="Executable file path" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="CheckInstallerType" />
+        </div>
+
+        <div class="d-flex mt-4">
+            <MudRadioGroup T="string" Required="true" RequiredError="Architecture is mandatory!"
+                           @bind-SelectedOption="PackageModel.Architecture" For="@(() => PackageModel.Architecture)">
+                <MudRadio Option="@("x86")">x86</MudRadio>
+                <MudRadio Option="@("x64")">x64</MudRadio>
+                <MudRadio Option="@("ARM")">ARM</MudRadio>
+                <MudRadio Option="@("ARM64")">ARM 64</MudRadio>
+            </MudRadioGroup>
+        </div>
+
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public CreatePackageDto PackageModel { get; set; }
+    [Parameter] public Installer Installer { get; set; }
+
+    IList<IBrowserFile> files = new List<IBrowserFile>();
+    private async void UploadFiles(IBrowserFile file)
+    {
+        files = new List<IBrowserFile>();
+        files.Add(file);
+
+        PackageModel.InstallerType = GetInstallerTypeFromContentType(file.ContentType);
+        //TODO : check if file extension is valid
+        // if (string.IsNullOrEmpty(model.InstallerType))
+        // {
+        //     return;
+        // }
+
+        using var content = new MultipartFormDataContent();
+
+        var fileContent = new StreamContent(file.OpenReadStream(128 * 1024 * 1024)); // 128 Mo Max
+
+        fileContent.Headers.ContentType =
+            new MediaTypeHeaderValue(file.ContentType);
+
+        content.Add(
+            content: fileContent,
+            name: "\"files\"",
+            fileName: file.Name);
+
+        var result = await Http.PostAsync($"api/v1/files", content);
+        if (result.IsSuccessStatusCode)
+        {
+            var resultContent = await result.Content.ReadFromJsonAsync<IList<UploadResult>>();
+            if (resultContent == null || resultContent.Count == 0)
+            {
+                snackBar.Add("Error during upload", Severity.Error);
+            }
+            else
+            {
+                foreach (var item in resultContent)
+                {
+                    if (item.ErrorCode > 0)
+                    {
+                        // TODO: map error code on a message
+                        snackBar.Add(item.ErrorCode.ToString(), Severity.Error);
+                    }
+                    else
+                    {
+                        PackageModel.Filename = item.FileName;
+                        PackageModel.Checksum = item.Checksum;
+                    }
+                }
+            }
+        }
+        else
+        {
+            snackBar.Add(result.ReasonPhrase, Severity.Error);
+        }
+    }
+
+    private bool CheckInstallerType => PackageModel.InstallerType != "zip";
+
+    //Based on content type value, give the installer type
+    private string GetInstallerTypeFromContentType(string contentType)
+    {
+        var installerType = "";
+        switch (contentType)
+        {
+            case "application/zip":
+                installerType = "zip";
+                break;
+            case "application/msi":
+                installerType = "msi";
+                break;
+            case "application/msix":
+                installerType = "msix";
+                break;
+        }
+
+        return installerType;
+    }
+}
