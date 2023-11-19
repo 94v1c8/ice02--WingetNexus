@@ -1,0 +1,60 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Newtonsoft.Json;
+@using System.Net.Http.Headers
+
+@attribute [Authorize]
+@inject IAntiforgeryHttpClientFactory httpClientFactory
+
+@inject MudBlazor.ISnackbar snackBar
+
+<MudDialog>
+    <DialogContent>
+            <MudPaper Class="mud-width-full mb-4 pa-4">
+                @* adding field for version form  *@            
+                <MudTextField T="string" Label="Version" Required="true" RequiredError="Version is required!" 
+                              @bind-Value="version.VersionCode" For="@(() => version.VersionCode)" />
+                <MudTextField T="string" Label="Short Description" Required="true" RequiredError="Description is required!"
+                              @bind-Value="version.ShortDescription" For="@(() => version.ShortDescription)" />
+
+            </MudPaper>
+
+            <MudGrid>
+                <MudItem xs="12">
+                    <InstallerList Version="@version" />
+                </MudItem>
+            </MudGrid>
+        
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+    </DialogActions>
+
+</MudDialog>
+
+@code
+{
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    // [Parameter] public Package package { get; set; }
+
+    [Parameter] public PackageVersion version { get; set; }
+
+    // bool success;
+    // string[] errors = { };
+    // MudForm form;
+    HttpClient client = null;
+
+    //CreatePackageDto model = new ();
+
+    protected override async Task OnInitializedAsync()
+    {
+        client = await httpClientFactory.CreateClientAsync();
+    }
+
+
+    void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(version));
+    }
+    void Cancel() => MudDialog.Cancel();
+}
